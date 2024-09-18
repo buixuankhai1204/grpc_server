@@ -3,43 +3,89 @@ syntax = "proto3";
 package live_connection;
 
 service Connection {
-    // Add inserts a new Item into the inventory.
-    rpc GetIpUserOnline (UsernameRequest) returns (IpUserOnlineResponse);
+  // Add inserts a new Item into the inventory.
+  rpc GetIpUserOnline (UsernameRequest) returns (IpUserOnlineResponse);
 
-    // Remove removes Items from the inventory.
-    rpc AddIpUserOnline (AddIpForUserRequest) returns (IpUserOnlineResponse);
+  // Remove removes Items from the inventory.
+  rpc AddIpUserOnline (AddIpForUserRequest) returns (IpUserOnlineResponse);
 
-    // Get retrieves Item information.
-    rpc GetIpTopicInit (TopicIdRequest) returns (IpTopicInitResponse);
+  // Get retrieves Item information.
+  rpc GetIpTopicInit (TopicIdRequest) returns (IpTopicInitResponse);
 
-    // UpdateQuantity increases or decreases the stock quantity of an Item.
-    rpc AddIpForTopicInit (AddIpForTopicRequest) returns (IpTopicInitResponse);
+  // UpdateQuantity increases or decreases the stock quantity of an Item.
+  rpc AddIpForTopicInit (AddIpForTopicRequest) returns (IpTopicInitResponse);
+
+  rpc GetAllTopicsIdByIp(IpRequest) returns (AllTopicsByIpResponse);
+
+  rpc PushNewTopicToIp(PushNewTopicToIpRequest) returns (PushNewTopicToIpResponse);
+
+  rpc PopOldTopicToIp(PopOldTopicToIpRequest) returns (PopOldTopicToIpResponse);
+
+  rpc GetFullInformationFromBackupServer(EmptyParam) returns (LiveConnectionResponse);
 }
+message EmptyParam {}
 
 message UsernameRequest {
-    string username = 1;
+  string username = 1;
+}
+
+message IpRequest {
+  string ip = 1;
 }
 
 message AddIpForUserRequest {
-    string username = 1;
-    string ip = 2;
+  string username = 1;
+  string ip = 2;
 }
 
 message IpUserOnlineResponse {
-    string username = 1;
-    string ip = 2;
+  string username = 1;
+  string ip = 2;
 }
 
 message TopicIdRequest {
-    string topic_id = 1;
+  string topic_id = 1;
 }
 
 message AddIpForTopicRequest {
-    string topic_id = 1;
-    string ip = 2;
+  string topic_id = 1;
+  string ip = 2;
 }
 
 message IpTopicInitResponse {
-    string topic_id = 1;
-    string ip = 2;
+  string topic_id = 1;
+  string ip = 2;
+}
+
+message AllTopicsByIpResponse {
+  string ip = 1;
+  repeated string topic_id = 2;
+}
+message PushNewTopicToIpRequest {
+  string topic_id = 1;
+  string ip = 2;
+}
+
+message PushNewTopicToIpResponse {
+  bool isSuccess = 1;
+}
+
+message PopOldTopicToIpRequest {
+  string topic_id = 1;
+  string ip = 2;
+}
+
+message PopOldTopicToIpResponse {
+  bool isSuccess = 1;
+}
+
+message TopicList {
+  repeated string topics = 1;
+}
+
+message LiveConnectionResponse {
+  map<string, string> user_online = 1;
+  map<string, string> topic_location = 2;
+
+  map<string, TopicList> topics_by_ip = 3;
 }

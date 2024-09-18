@@ -1,4 +1,4 @@
-use std::collections::{HashSet};
+use std::collections::{HashMap, HashSet};
 use dashmap::DashMap;
 use tonic::{Request, Response, Status};
 
@@ -23,11 +23,11 @@ const UNSUFF_INV_ERR: &str = "not enough inventory for quantity change";
 // InventoryServer Implementation
 // -----------------------------------------------------------------------------
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LiveConnection {
     user_online: DashMap<String, String>,
     topic_location: DashMap<String, String>,
-    topics_by_ip: HashSet<String, Vec<String>>,
+    topics_by_ip: DashMap<String, Vec<String>>,
 }
 
 impl Default for LiveConnection {
@@ -65,15 +65,85 @@ impl Connection for LiveConnection {
     }
 
     async fn add_ip_for_topic_init(&self, request: Request<AddIpForTopicRequest>) -> Result<Response<IpTopicInitResponse>, Status> {
+        let a = request.into_inner();
+
         Ok(Response::new(IpTopicInitResponse {
             topic_id: "asfsafsdf".to_string(),
             ip: "sfasfasf".to_string(),
         }))
+    }
+
+    async fn get_all_topics_id_by_ip(&self, request: Request<IpRequest>) -> Result<Response<AllTopicsByIpResponse>, Status> {
+        todo!()
+    }
+
+    async fn push_new_topic_to_ip(&self, request: Request<PushNewTopicToIpRequest>) -> Result<Response<PushNewTopicToIpResponse>, Status> {
+        todo!()
+    }
+
+    async fn pop_old_topic_to_ip(&self, request: Request<PopOldTopicToIpRequest>) -> Result<Response<PopOldTopicToIpResponse>, Status> {
+        todo!()
+    }
+
+    async fn get_full_information_from_backup_server(&self, request: Request<EmptyParam>) -> Result<Response<LiveConnectionResponse>, Status> {
+        Ok(Response::new(LiveConnectionResponse::try_from(self).expect("can not parse!")))
     }
 }
 
 // -----------------------------------------------------------------------------
 // Testing
 // -----------------------------------------------------------------------------
+fn dashmap_to_hashmap<K, V>(dashmap: DashMap<K, V>) -> HashMap<K, V>
+where
+    K: std::hash::Hash + Eq + Clone,
+    V: Clone,
+{
+    let mut hashmap = HashMap::new();
 
+    for item in dashmap.into_iter() {
+        hashmap.insert(item.0, item.1); // item.0 is the key, item.1 is the value
+    }
 
+    hashmap
+}
+
+fn dashmap_to_hashmap_with_struct<K, V>(hashset: DashMap<K, Vec<String>>) -> HashMap<K, TopicList>
+where
+    K: std::hash::Hash + Eq + Clone,
+    V: Clone,
+{
+    let mut hashmap = HashMap::new();
+
+    for (key, value) in hashset {
+        let mut topic_list: TopicList = TopicList { topics: value };
+
+        hashmap.insert(key, topic_list);
+    }
+
+    hashmap
+}
+
+impl TryFrom<&LiveConnection> for LiveConnectionResponse {
+    type Error = ();
+
+    fn try_from(live_connection: &LiveConnection) -> Result<Self, Self::Error> {
+        let mut result = LiveConnectionResponse::default();
+
+        if live_connection.user_online.is_empty() {
+            return Err(());
+        };
+        result.user_online = dashmap_to_hashmap(live_connection.clone().user_online);
+
+        if live_connection.topic_location.is_empty() {
+            return Err(());
+        }
+        result.topic_location = dashmap_to_hashmap(live_connection.clone().topic_location);
+
+        if live_connection.topics_by_ip.is_empty() {
+            return Err(());
+        }
+
+        result.topics_by_ip = dashmap_to_hashmap_with_struct::<String, Vec<String>>(live_connection.clone().topics_by_ip);
+        Ok(result)
+    }
+}
