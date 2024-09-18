@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package live_connection;
+
+service Connection {
+    // Add inserts a new Item into the inventory.
+    rpc GetIpUserOnline (UsernameRequest) returns (IpUserOnlineResponse);
+
+    // Remove removes Items from the inventory.
+    rpc AddIpUserOnline (AddIpForUserRequest) returns (IpUserOnlineResponse);
+
+    // Get retrieves Item information.
+    rpc GetIpTopicInit (TopicIdRequest) returns (IpTopicInitResponse);
+
+    // UpdateQuantity increases or decreases the stock quantity of an Item.
+    rpc AddIpForTopicInit (AddIpForTopicRequest) returns (IpTopicInitResponse);
+}
+
+message UsernameRequest {
+    string username = 1;
+}
+
+message AddIpForUserRequest {
+    string username = 1;
+    string ip = 2;
+}
+
+message IpUserOnlineResponse {
+    string username = 1;
+    string ip = 2;
+}
+
+message TopicIdRequest {
+    string topic_id = 1;
+}
+
+message AddIpForTopicRequest {
+    string topic_id = 1;
+    string ip = 2;
+}
+
+message IpTopicInitResponse {
+    string topic_id = 1;
+    string ip = 2;
+}
