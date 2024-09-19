@@ -8,6 +8,7 @@ use tonic::transport::{Channel, Server};
 use tonic::{Request, Response, Status};
 use anyhow::Result as AnyhowResult;
 use anyhow::Error as AnyhowError;
+use dashmap::mapref::one::Ref;
 
 #[derive(Debug, Clone)]
 pub struct LiveConnection {
@@ -30,10 +31,15 @@ impl Default for LiveConnection {
 #[tonic::async_trait]
 impl Connection for LiveConnection {
     async fn get_ip_user_online(&self, request: Request<UsernameRequest>) -> Result<Response<IpUserOnlineResponse>, Status> {
-        Ok(Response::new(IpUserOnlineResponse {
-            username: "asfsafsdf".to_string(),
-            ip: "sfasfasf".to_string(),
-        }))
+        let username_ip = self.user_online.get(&request.into_inner().username);
+        match username_ip {
+            None => {
+                Ok(Response::new(IpUserOnlineResponse { username: "".to_string(), ip: "".to_string() }))
+            }
+            Some(value) => {
+                Ok(Response::new(IpUserOnlineResponse { username: value.key().to_string(), ip: value.value().to_string() }))
+            }
+        }
     }
 
     async fn add_ip_user_online(&self, request: Request<AddIpForUserRequest>) -> Result<Response<IpUserOnlineResponse>, Status> {
@@ -54,12 +60,14 @@ impl Connection for LiveConnection {
     }
 
     async fn add_ip_for_topic_init(&self, request: Request<AddIpForTopicRequest>) -> Result<Response<IpTopicInitResponse>, Status> {
-        let a = request.into_inner();
-
         Ok(Response::new(IpTopicInitResponse {
             topic_id: "asfsafsdf".to_string(),
             ip: "sfasfasf".to_string(),
         }))
+    }
+
+    async fn remove_ip_for_topic_init(&self, request: Request<AddIpForTopicRequest>) -> Result<Response<IpTopicInitResponse>, Status> {
+        todo!()
     }
 
     async fn get_all_topics_id_by_ip(&self, request: Request<IpRequest>) -> Result<Response<AllTopicsByIpResponse>, Status> {
