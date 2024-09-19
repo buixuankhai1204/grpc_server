@@ -1,33 +1,19 @@
-use std::collections::{HashMap, HashSet};
-use dashmap::DashMap;
-use tonic::{Request, Response, Status};
-
-use crate::live_connection::connection_server::Connection;
+use crate::live_connection::connection_client::ConnectionClient;
+use crate::live_connection::connection_server::{Connection, ConnectionServer};
 use crate::live_connection::*;
-
-// -----------------------------------------------------------------------------
-// Error Messages
-// -----------------------------------------------------------------------------
-
-const BAD_PRICE_ERR: &str = "provided PRICE was invalid";
-const DUP_PRICE_ERR: &str = "item is already at this price";
-const DUP_ITEM_ERR: &str = "item already exists in inventory";
-const EMPTY_QUANT_ERR: &str = "invalid quantity of 0 provided";
-const EMPTY_SKU_ERR: &str = "provided SKU was empty";
-const NO_ID_ERR: &str = "no ID or SKU provided for item";
-const NO_ITEM_ERR: &str = "the item requested was not found";
-const NO_STOCK_ERR: &str = "no stock provided for item";
-const UNSUFF_INV_ERR: &str = "not enough inventory for quantity change";
-
-// -----------------------------------------------------------------------------
-// InventoryServer Implementation
-// -----------------------------------------------------------------------------
+use dashmap::DashMap;
+use std::collections::HashMap;
+use std::sync::Once;
+use tonic::transport::{Channel, Server};
+use tonic::{Request, Response, Status};
+use anyhow::Result as AnyhowResult;
+use anyhow::Error as AnyhowError;
 
 #[derive(Debug, Clone)]
 pub struct LiveConnection {
-    user_online: DashMap<String, String>,
-    topic_location: DashMap<String, String>,
-    topics_by_ip: DashMap<String, Vec<String>>,
+    pub user_online: DashMap<String, String>,
+    pub topic_location: DashMap<String, String>,
+    pub topics_by_ip: DashMap<String, Vec<String>>,
 }
 
 impl Default for LiveConnection {
@@ -51,9 +37,12 @@ impl Connection for LiveConnection {
     }
 
     async fn add_ip_user_online(&self, request: Request<AddIpForUserRequest>) -> Result<Response<IpUserOnlineResponse>, Status> {
+        let request_object = &request.into_inner();
+        self.user_online.insert((*request_object.username.to_string()).parse().unwrap(), request_object.ip.to_string());
+
         Ok(Response::new(IpUserOnlineResponse {
-            username: "asfsafsdf".to_string(),
-            ip: "sfasfasf".to_string(),
+            username: request_object.username.to_string(),
+            ip: request_object.ip.to_string(),
         }))
     }
 
@@ -86,7 +75,7 @@ impl Connection for LiveConnection {
     }
 
     async fn get_full_information_from_backup_server(&self, request: Request<EmptyParam>) -> Result<Response<LiveConnectionResponse>, Status> {
-        Ok(Response::new(LiveConnectionResponse::try_from(self).expect("can not parse!")))
+        Ok(Response::new(LiveConnectionResponse::try_from(self).expect("Can not parse!")))
     }
 }
 
@@ -107,6 +96,20 @@ where
     hashmap
 }
 
+fn hashmap_to_dashmap<K, V>(hashmap: HashMap<K, V>) -> DashMap<K, V>
+where
+    K: std::hash::Hash + Eq + Clone,
+    V: Clone,
+{
+    let dashmap = DashMap::new();
+
+    for (key, value) in hashmap {
+        dashmap.insert(key, value);
+    }
+
+    dashmap
+}
+
 fn dashmap_to_hashmap_with_struct<K, V>(hashset: DashMap<K, Vec<String>>) -> HashMap<K, TopicList>
 where
     K: std::hash::Hash + Eq + Clone,
@@ -121,6 +124,22 @@ where
     }
 
     hashmap
+}
+
+fn hashmap_to_dashmap_with_struct<K, V>(hash_map: HashMap<K, TopicList>) -> DashMap<K, Vec<String>>
+where
+    K: std::hash::Hash + Eq + Clone,
+    V: Clone,
+{
+    let mut dashmap = DashMap::new();
+    let mut topic_list: Vec<String> = vec![];
+    for (key, topic_list_value) in hash_map {
+        topic_list = topic_list_value.topics;
+
+        dashmap.insert(key, topic_list);
+    }
+
+    dashmap
 }
 
 impl TryFrom<&LiveConnection> for LiveConnectionResponse {
@@ -147,3 +166,68 @@ impl TryFrom<&LiveConnection> for LiveConnectionResponse {
         Ok(result)
     }
 }
+
+impl TryFrom<&LiveConnectionResponse> for LiveConnection {
+    type Error = ();
+
+    fn try_from(live_connection_response: &LiveConnectionResponse) -> Result<Self, Self::Error> {
+        let mut result = LiveConnection::default();
+
+        if live_connection_response.user_online.is_empty() {
+            return Err(());
+        };
+        result.user_online = hashmap_to_dashmap(live_connection_response.clone().user_online);
+
+        if live_connection_response.topic_location.is_empty() {
+            return Err(());
+        }
+        result.topic_location = hashmap_to_dashmap(live_connection_response.clone().topic_location);
+
+        if live_connection_response.topics_by_ip.is_empty() {
+            return Err(());
+        }
+
+        result.topics_by_ip = hashmap_to_dashmap_with_struct::<String, Vec<String>>(live_connection_response.clone().topics_by_ip);
+        Ok(result)
+    }
+}
+
+static SERVER_INIT: Once = Once::new();
+async fn get_client(target_ip_backup: &str) -> ConnectionClient<Channel> {
+    SERVER_INIT.call_once(|| {
+        tokio::spawn(async {
+            let addr = "127.0.0.1:8080".parse().unwrap();
+            let inventory = LiveConnection::default();
+            Server::builder()
+                .add_service(ConnectionServer::new(inventory))
+                .serve(addr)
+                .await
+                .unwrap();
+        });
+    });
+
+    loop {
+        match ConnectionClient::connect(target_ip_backup.to_string()).await {
+            Ok(client) => return client,
+            Err(_) => println!("waiting for server connection"),
+        };
+    }
+}
+
+pub async fn first_time_grpc_online(
+    target_ip_backup: String,
+) -> AnyhowResult<Response<LiveConnection>> {
+    let mut client = get_client(&target_ip_backup).await;
+    match client
+        .get_full_information_from_backup_server(Request::new(EmptyParam {}))
+        .await
+    {
+        Ok(value) => {
+            Ok(Response::new(LiveConnection::try_from(&value.into_inner()).unwrap()))
+        }
+        Err(err) => {
+            Err(AnyhowError::from(err))
+        }
+    }
+}
+

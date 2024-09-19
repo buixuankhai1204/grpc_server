@@ -3,17 +3,15 @@ syntax = "proto3";
 package live_connection;
 
 service Connection {
-  // Add inserts a new Item into the inventory.
   rpc GetIpUserOnline (UsernameRequest) returns (IpUserOnlineResponse);
 
-  // Remove removes Items from the inventory.
   rpc AddIpUserOnline (AddIpForUserRequest) returns (IpUserOnlineResponse);
 
-  // Get retrieves Item information.
   rpc GetIpTopicInit (TopicIdRequest) returns (IpTopicInitResponse);
 
-  // UpdateQuantity increases or decreases the stock quantity of an Item.
   rpc AddIpForTopicInit (AddIpForTopicRequest) returns (IpTopicInitResponse);
+  
+  rpc RemoveIpForTopicInit (AddIpForTopicRequest) returns (IpTopicInitResponse);
 
   rpc GetAllTopicsIdByIp(IpRequest) returns (AllTopicsByIpResponse);
 

@@ -183,7 +183,6 @@ pub mod connection_client {
             self.inner = self.inner.max_encoding_message_size(limit);
             self
         }
-        /// Add inserts a new Item into the inventory.
         pub async fn get_ip_user_online(
             &mut self,
             request: impl tonic::IntoRequest<super::UsernameRequest>,
@@ -211,7 +210,6 @@ pub mod connection_client {
                 );
             self.inner.unary(req, path, codec).await
         }
-        /// Remove removes Items from the inventory.
         pub async fn add_ip_user_online(
             &mut self,
             request: impl tonic::IntoRequest<super::AddIpForUserRequest>,
@@ -239,7 +237,6 @@ pub mod connection_client {
                 );
             self.inner.unary(req, path, codec).await
         }
-        /// Get retrieves Item information.
         pub async fn get_ip_topic_init(
             &mut self,
             request: impl tonic::IntoRequest<super::TopicIdRequest>,
@@ -265,7 +262,6 @@ pub mod connection_client {
                 .insert(GrpcMethod::new("live_connection.Connection", "GetIpTopicInit"));
             self.inner.unary(req, path, codec).await
         }
-        /// UpdateQuantity increases or decreases the stock quantity of an Item.
         pub async fn add_ip_for_topic_init(
             &mut self,
             request: impl tonic::IntoRequest<super::AddIpForTopicRequest>,
@@ -290,6 +286,33 @@ pub mod connection_client {
             req.extensions_mut()
                 .insert(
                     GrpcMethod::new("live_connection.Connection", "AddIpForTopicInit"),
+                );
+            self.inner.unary(req, path, codec).await
+        }
+        pub async fn remove_ip_for_topic_init(
+            &mut self,
+            request: impl tonic::IntoRequest<super::AddIpForTopicRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::IpTopicInitResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/live_connection.Connection/RemoveIpForTopicInit",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("live_connection.Connection", "RemoveIpForTopicInit"),
                 );
             self.inner.unary(req, path, codec).await
         }
@@ -413,7 +436,6 @@ pub mod connection_server {
     /// Generated trait containing gRPC methods that should be implemented for use with ConnectionServer.
     #[async_trait]
     pub trait Connection: std::marker::Send + std::marker::Sync + 'static {
-        /// Add inserts a new Item into the inventory.
         async fn get_ip_user_online(
             &self,
             request: tonic::Request<super::UsernameRequest>,
@@ -421,7 +443,6 @@ pub mod connection_server {
             tonic::Response<super::IpUserOnlineResponse>,
             tonic::Status,
         >;
-        /// Remove removes Items from the inventory.
         async fn add_ip_user_online(
             &self,
             request: tonic::Request<super::AddIpForUserRequest>,
@@ -429,7 +450,6 @@ pub mod connection_server {
             tonic::Response<super::IpUserOnlineResponse>,
             tonic::Status,
         >;
-        /// Get retrieves Item information.
         async fn get_ip_topic_init(
             &self,
             request: tonic::Request<super::TopicIdRequest>,
@@ -437,8 +457,14 @@ pub mod connection_server {
             tonic::Response<super::IpTopicInitResponse>,
             tonic::Status,
         >;
-        /// UpdateQuantity increases or decreases the stock quantity of an Item.
         async fn add_ip_for_topic_init(
+            &self,
+            request: tonic::Request<super::AddIpForTopicRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::IpTopicInitResponse>,
+            tonic::Status,
+        >;
+        async fn remove_ip_for_topic_init(
             &self,
             request: tonic::Request<super::AddIpForTopicRequest>,
         ) -> std::result::Result<
@@ -716,6 +742,52 @@ pub mod connection_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = AddIpForTopicInitSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/live_connection.Connection/RemoveIpForTopicInit" => {
+                    #[allow(non_camel_case_types)]
+                    struct RemoveIpForTopicInitSvc<T: Connection>(pub Arc<T>);
+                    impl<
+                        T: Connection,
+                    > tonic::server::UnaryService<super::AddIpForTopicRequest>
+                    for RemoveIpForTopicInitSvc<T> {
+                        type Response = super::IpTopicInitResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::AddIpForTopicRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Connection>::remove_ip_for_topic_init(&inner, request)
+                                    .await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = RemoveIpForTopicInitSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
