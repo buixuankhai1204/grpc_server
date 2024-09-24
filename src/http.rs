@@ -68,38 +68,38 @@ impl Message for MessageService {
 
         let (tx, rx) = mpsc::channel(64); // buffer size of 64 messages
 
-        self.internal_connections.insert("xuankhai".to_owned(), tx.clone());
+        // self.internal_connections.insert("xuankhai".to_owned(), tx.clone());
         println!("{:?}", self.internal_connections);
         tx.send(Ok(response)).await.expect("TODO: panic message");
-        if !self.internal_connections.contains_key(&"xuankhai".to_owned()) {
-            println!("xuankhai");
-            return Ok(Response::new(ReceiverStream::new(rx)));
-        }
-        while let Some(result) = payload.next().await {
-            // println!("{:?}", self.internal_connections.get(&"xuankhai".to_owned()).unwrap());
-            match result {
-                Ok(v) => self.internal_connections.get(&"xuankhai".to_owned()).unwrap()
-                    .send(Ok(MessageResponse { id: v.id, message: v.message }))
-                    // .send(Ok(MessageResponse { id: "afasf".to_owned(), message: "asfasf".to_owned() }))
-                    .await
-                    .expect("working rx"),
-                Err(err) => {
-                    if let Some(io_err) = match_for_io_error(&err) {
-                        if io_err.kind() == ErrorKind::BrokenPipe {
-                            // here you can handle special case when client
-                            // disconnected in unexpected way
-                            eprintln!("\tclient disconnected: broken pipe");
-                            break;
-                        }
-                    }
-
-                    match tx.send(Err(err)).await {
-                        Ok(_) => (),
-                        Err(_err) => break, // response was dropped
-                    }
-                }
-            }
-        }
+        // if !self.internal_connections.contains_key(&"xuankhai".to_owned()) {
+        //     println!("xuankhai");
+        //     return Ok(Response::new(ReceiverStream::new(rx)));
+        // }
+        // while let Some(result) = payload.next().await {
+        //     // println!("{:?}", self.internal_connections.get(&"xuankhai".to_owned()).unwrap());
+        //     match result {
+        //         Ok(v) => self.internal_connections.get(&"xuankhai".to_owned()).unwrap()
+        //             .send(Ok(MessageResponse { id: v.id, message: v.message }))
+        //             // .send(Ok(MessageResponse { id: "afasf".to_owned(), message: "asfasf".to_owned() }))
+        //             .await
+        //             .expect("working rx"),
+        //         Err(err) => {
+        //             if let Some(io_err) = match_for_io_error(&err) {
+        //                 if io_err.kind() == ErrorKind::BrokenPipe {
+        //                     // here you can handle special case when client
+        //                     // disconnected in unexpected way
+        //                     eprintln!("\tclient disconnected: broken pipe");
+        //                     break;
+        //                 }
+        //             }
+        // 
+        //             match tx.send(Err(err)).await {
+        //                 Ok(_) => (),
+        //                 Err(_err) => break, // response was dropped
+        //             }
+        //         }
+        //     }
+        // }
         println!("{:?}", self.internal_connections);
         Ok(Response::new(ReceiverStream::new(rx)))
 
