@@ -21,6 +21,8 @@ serde = { version = "1.0.210", features = ["default"] }
 anyhow = "1.0.89"
 scylla = "0.14.0"
 charybdis = "0.7.7"
+tracing = "0.1.40"
+h2 = "0.4.6"
 
 [build-dependencies]
 tonic-build = "0.12.2"
