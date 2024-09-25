@@ -4,12 +4,10 @@ use std::sync::Arc;
 use std::time::Duration;
 use dashmap::DashMap;
 use tokio::sync::mpsc;
-use tokio::sync::mpsc::Sender;
 use tokio_stream::StreamExt;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{async_trait, Request, Response, Status, Streaming};
-use crate::message::message_client::MessageClient;
-use crate::message::message_server::{Message, MessageServer};
+use crate::message::message_server::{Message};
 use crate::message::*;
 
 type InternalConnections<T> = Arc<DashMap<String, mpsc::Sender<Result<T, Status>>>>;
@@ -61,14 +59,19 @@ impl MessageService {
 impl Message for MessageService {
     type SendMessageStream = ReceiverStream<Result<MessageResponse, Status>>;
 
-    async fn send_message(&self, request: Request<Streaming<MessageRequest>>) -> Result<Response<Self::SendMessageStream>, Status> {
+    async fn send_message(&self, request: Request<Streaming<MessageRequest>>) -> Result<Response<Self::SendMessageStream>, Status>
+    where
+        Self: Send + Sync + 'static,   // Added bounds for self
+    {
+        let clone = self.internal_connections.get(&"xuankhai".to_owned()).unwrap().clone();
+
         let mut payload = request.into_inner();
         let response: MessageResponse =
             MessageResponse { id: "Internal Server Error".to_owned(), message: "Please try again!".to_owned() };
 
         let (tx, rx) = mpsc::channel(64); // buffer size of 64 messages
 
-        // self.internal_connections.insert("xuankhai".to_owned(), tx.clone());
+        self.internal_connections.insert("xuankhai".to_owned(), tx.clone());
         println!("{:?}", self.internal_connections);
         // if !self.internal_connections.contains_key(&"xuankhai".to_owned()) {
         //     println!("xuankhai");
@@ -78,7 +81,7 @@ impl Message for MessageService {
             while let Some(result) = payload.next().await {
                 // println!("{:?}", self.internal_connections.get(&"xuankhai".to_owned()).unwrap());
                 match result {
-                    Ok(v) => tx
+                    Ok(v) => clone
                         .send(Ok(MessageResponse { id: v.id, message: v.message }))
                         // .send(Ok(MessageResponse { id: "afasf".to_owned(), message: "asfasf".to_owned() }))
                         .await
@@ -102,7 +105,6 @@ impl Message for MessageService {
             }
         });
 
-        println!("{:?}", self.internal_connections);
         Ok(Response::new(ReceiverStream::new(rx)))
 
         // let mut stream = Box::pin(tokio_stream::iter(repeat).throttle(Duration::from_millis(3000)));
