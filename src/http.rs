@@ -70,36 +70,38 @@ impl Message for MessageService {
 
         // self.internal_connections.insert("xuankhai".to_owned(), tx.clone());
         println!("{:?}", self.internal_connections);
-        tx.send(Ok(response)).await.expect("TODO: panic message");
         // if !self.internal_connections.contains_key(&"xuankhai".to_owned()) {
         //     println!("xuankhai");
         //     return Ok(Response::new(ReceiverStream::new(rx)));
         // }
-        // while let Some(result) = payload.next().await {
-        //     // println!("{:?}", self.internal_connections.get(&"xuankhai".to_owned()).unwrap());
-        //     match result {
-        //         Ok(v) => self.internal_connections.get(&"xuankhai".to_owned()).unwrap()
-        //             .send(Ok(MessageResponse { id: v.id, message: v.message }))
-        //             // .send(Ok(MessageResponse { id: "afasf".to_owned(), message: "asfasf".to_owned() }))
-        //             .await
-        //             .expect("working rx"),
-        //         Err(err) => {
-        //             if let Some(io_err) = match_for_io_error(&err) {
-        //                 if io_err.kind() == ErrorKind::BrokenPipe {
-        //                     // here you can handle special case when client
-        //                     // disconnected in unexpected way
-        //                     eprintln!("\tclient disconnected: broken pipe");
-        //                     break;
-        //                 }
-        //             }
-        // 
-        //             match tx.send(Err(err)).await {
-        //                 Ok(_) => (),
-        //                 Err(_err) => break, // response was dropped
-        //             }
-        //         }
-        //     }
-        // }
+        tokio::spawn(async move {
+            while let Some(result) = payload.next().await {
+                // println!("{:?}", self.internal_connections.get(&"xuankhai".to_owned()).unwrap());
+                match result {
+                    Ok(v) => tx
+                        .send(Ok(MessageResponse { id: v.id, message: v.message }))
+                        // .send(Ok(MessageResponse { id: "afasf".to_owned(), message: "asfasf".to_owned() }))
+                        .await
+                        .expect("working rx"),
+                    Err(err) => {
+                        if let Some(io_err) = match_for_io_error(&err) {
+                            if io_err.kind() == ErrorKind::BrokenPipe {
+                                // here you can handle special case when client
+                                // disconnected in unexpected way
+                                eprintln!("\tclient disconnected: broken pipe");
+                                break;
+                            }
+                        }
+
+                        match tx.send(Err(err)).await {
+                            Ok(_) => (),
+                            Err(_err) => break, // response was dropped
+                        }
+                    }
+                }
+            }
+        });
+
         println!("{:?}", self.internal_connections);
         Ok(Response::new(ReceiverStream::new(rx)))
 
@@ -121,5 +123,34 @@ impl Message for MessageService {
 
         // tx.send(Result::<_, Status>::Ok(response)).await.unwrap();
         // Ok(Response::new(ReceiverStream::new(rx)))
+    }
+
+    type SendMessageServerStream = (ReceiverStream<Result<MessageResponse, Status>>);
+
+    async fn send_message_server(&self, request: Request<MessageRequest>) -> Result<Response<Self::SendMessageServerStream>, Status> {
+        let payload = request.into_inner();
+        let id = payload.id.to_owned();
+        let message = payload.message.to_owned();
+        let (tx, rx) = mpsc::channel(64); // buffer size of 64 messages
+        let response: MessageResponse =
+            MessageResponse { id: "Internal Server Error".to_owned(), message: "Please try again!".to_owned() };
+
+        let repeat = std::iter::repeat(response);
+        let mut stream = Box::pin(tokio_stream::iter(repeat).throttle(Duration::from_millis(200)));
+        tokio::spawn(async move {
+            while let Some(item) = stream.next().await {
+                match tx.send(Result::<_, Status>::Ok(item)).await {
+                    Ok(_) => {
+                        // item (server response) was queued to be send to client
+                    }
+                    Err(_item) => {
+                        // output_stream was build from rx and both are dropped
+                        break;
+                    }
+                }
+            }
+            println!("\tclient disconnected");
+        });
+        Ok(Response::new(ReceiverStream::new(rx)))
     }
 }

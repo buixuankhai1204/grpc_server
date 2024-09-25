@@ -1,5 +1,6 @@
 use std::cell::{Cell, RefCell};
 use std::future::Future;
+use std::net::ToSocketAddrs;
 use tonic::transport::Server;
 
 use crate::live_connection::connection_server::ConnectionServer;
@@ -42,7 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Server::builder()
         .add_service(msg_server)
         .add_service(reflection_service)
-        .serve(addr.parse()?)
+        .serve(addr.to_socket_addrs().unwrap().next().unwrap())
         .await?;
     Ok(())
 }
